@@ -18,11 +18,11 @@ class SVM():
         self.a = np.zeros(data.shape[0])
         self.b = 0
 
-    def k(self, x1, x2):
+    def k(self, x1, x2): # RBF核函数
         return math.exp(-sum((x1-x2)**2)/(2*self.sigma**2))
 
     
-    def g(self,x):
+    def g(self,x): # 函数g(x)
         temp = 0
         for i in range(self.data_num):
             temp += self.a[i]*self.label[i]*self.k(self.data[i,:],x)
@@ -99,8 +99,8 @@ class SVM():
             E[pos_i] = self.g(self.data[pos_i,:]) - self.label[pos_i]
             done = self.finishTrain(self.a, self.b)
             if done:
-                return self.a, self.b
                 break
+        return self.a, self.b
             
 
 
