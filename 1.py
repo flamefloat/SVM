@@ -1,11 +1,17 @@
 import math
 import numpy as np 
-a=math.exp(0)
+import matplotlib.pyplot as plt
+#a=math.exp(0)
 b=np.array([1,2,3,3])
 c=np.array([9,1,1,7])
 
-d=b-c
-e=np.linalg.norm(d,ord=2)
-pos = np.argmax(c)
-print(pos)
-print(2>=1 and 2<=3)
+a=[]
+a.append([1,2])
+a.append([5,6,7])
+a.append(0)
+b=[1, 2, 4, 7, 0.6,7]
+bb = np.argmin(b)
+print(a,bb)
+
+
+    
