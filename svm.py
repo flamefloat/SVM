@@ -1,5 +1,6 @@
 import math
-import numpy as np 
+import numpy as np
+from numpy import * 
 import scipy.io as scio
 import matplotlib.pyplot as plt
 
@@ -10,307 +11,186 @@ class SVM():
     c:惩罚系数
     sigma:RBF核函数参数
     """
-    def __init__(self, data, label, c, sigma, toler, maxIter, kernel):
+    def __init__(self, data, label, c, sigma, toler, kernelOpt):
         self.data = data
         self.label = label
         self.c = c
         self.sigma = sigma
         self.toler = toler #KKT条件精度
-        self.maxIter = maxIter
-        self.kernel = kernel
+        self.kernelOpt = kernelOpt
         self.data_num = data.shape[0] # 训练集长度
         self.data_width = data.shape[1] #实例维度
-        #self.a = np.zeros(data.shape[0])
-        #self.b = 0
-        #self.E = np.zeros(self.data_num)
-
-    def k(self, x1, x2): # 默认RBF核函数
-        if self.kernel == 'linear':
-            return sum(x1*x2)
-        else:
-            return math.exp(-sum((x1-x2)**2)/(2*self.sigma**2))
-
-    
-    def g(self, x, a, b): # 函数g(x)
-        temp = 0
-        for i in range(self.data_num):
-            temp += a[i]*self.label[i]*self.k(self.data[i,:],x)
-        temp += b
-        return temp
-
-    def updateParam(self, a, b, E, pos_j, pos_i):
-        #更新 a1, a2, b,E
-        old_a1 = a[pos_j]
-        old_a2 = a[pos_i]
-        eta = self.k(self.data[pos_j], self.data[pos_j])\
-             +self.k(self.data[pos_i], self.data[pos_i])\
-             -2*self.k(self.data[pos_i], self.data[pos_j])
-        temp_a2 = old_a2 + self.label[pos_i] * (E[pos_j] - E[pos_i]) / eta
-        if self.label[pos_i] == self.label[pos_j]:
-            L = max(0, old_a2 + old_a1 - self.c)
-            H = min(self.c, old_a2 + old_a1)
-        else:
-            L = max(0, old_a2 - old_a1)
-            H = min(self.c, self.c + old_a2 - old_a1)
-        if temp_a2 > H:
-            a[pos_i] = H
-        elif temp_a2 < L:
-            a[pos_i] = L
-        else:
-            a[pos_i] = temp_a2
-        a[pos_j] = old_a1 + self.label[pos_j] * self.label[pos_i] * (old_a2 - a[pos_i])
-        new_b1 = -E[pos_j]\
-                 - self.label[pos_j]*self.k(self.data[pos_j], self.data[pos_j])*(a[pos_j]-old_a1)\
-                 - self.label[pos_i]*self.k(self.data[pos_i], self.data[pos_j])*(a[pos_i]-old_a2)\
-                 + b
-        new_b2 = -E[pos_i]\
-                 - self.label[pos_j]*self.k(self.data[pos_j], self.data[pos_i])*(a[pos_j]-old_a1)\
-                 - self.label[pos_i]*self.k(self.data[pos_i], self.data[pos_i])*(a[pos_i]-old_a2)\
-                 + b
-        if (a[pos_j] > 0) and (a[pos_j] < self.c):
-            b = new_b1
-        elif (a[pos_i] > 0) and (a[pos_i] < self.c):
-            b = new_b2
-        else:
-            b = (new_b1 + new_b2) / 2
-        E[pos_j] = self.g(self.data[pos_j,:], a, b) - self.label[pos_j]
-        E[pos_i] = self.g(self.data[pos_i,:], a, b) - self.label[pos_i]
-        return a, b, E
-
-    def find(self, a, b, E, pos_j, last_loss):
-        if E[pos_j] >=0:
-            pos_i = np.argmin(E) #TODO 
-        else:
-            pos_i = np.argmax(E)
-        return pos_j, pos_i
-        """
-        temp_a, temp_b, temp_E = self.updateParam(a, b, E, pos_j, pos_i)
-        
-        next_loss = self.lossCount(temp_a)
-        Temp_a = []
-        Temp_b = []
-        Temp_E = []
-        print('lastloss:',last_loss,'nextloss:',next_loss)
-
-        if last_loss > next_loss:
-            return pos_j, pos_i
-        else :
-            tempLoss = []
-            for i in range(self.data_num):#遍历整个训练集寻找a2
-                if pos_j != i:
-                    pos_i = i
-                else:
-                    tempLoss.append(10000)
-                    Temp_a.append([0])
-                    Temp_b.append([0])
-                    Temp_E.append([0])
-                    continue
-                temp_a, temp_b, temp_E = self.updateParam(a, b, E, pos_j, pos_i)
-                next_loss = self.lossCount(temp_a)
-                tempLoss.append(next_loss)
-                Temp_a.append(temp_a)
-                Temp_b.append(temp_b)
-                Temp_E.append(temp_E)
-            pos_i = np.argmin(tempLoss)
-            print('tempLoss[pos_i]',tempLoss[pos_i])
-            if tempLoss[pos_i] < last_loss:
-                return pos_j, pos_i
-            else : # 寻找新的a1
-                return False
-        
-            
-                temp_error = error
-                temp_error[pos_j] = 0
-                pos_j = np.argmax(temp_error)
-                print('**********','pos_j:',pos_j,'temp_error[pos_j]:',temp_error[pos_j])
-                #print('lastloss:',last_loss)
-                self.find(a, b, E, pos_j, temp_error, last_loss)
-        """
-                 
-            
-
-
-
-    def finishTrain(self, a, b): # 判断是否满足结束训练的条件
-        temp = 0
-        for i in range(self.data_num):
-            temp += a[i]*self.label[i]
-        if temp != 0:
-            return False
-        else:
-            for i in range(self.data_num):
-                if self.label[i]*self.g(self.data[i,:], a, b) == 1:
-                    if a[i] >= self.c or a[i] <= 0:
-                        return False
-                elif self.label[i]*self.g(self.data[i,:], a, b) < 1:
-                    if a[i] != self.c:
-                        return False
-                else:
-                    if a[i] != 0:
-                        return False
-        return True
-
-    def lossCount(self, a):
-        loss = 0
+        self.a = np.zeros((self.data_num, 1))
+        self.b = 0
+        self.E = np.zeros((self.data_num,2))
+        self.K = np.zeros((self.data_num,self.data_num))
         for i in range(self.data_num):
             for j in range(self.data_num):
-                loss += a[i]*a[j]*self.label[i]*self.label[j]\
-                       *self.k(self.data[i,:],self.data[j,:])
-        loss = 0.5*loss-sum(a)
+                self.K[i,j] = kernel(self.data[i,:], self.data[j,:], self.sigma, self.kernelOpt)
+
+def kernel(x1, x2, sigma, opt): # 默认RBF核函数
+    if opt == 'linear':
+        return sum(x1*x2)
+    else:
+        return math.exp(-sum((x1-x2)**2)/(2*sigma**2))
+
+def g(svm, k): # 函数g(x),xk:实例的下标
+        temp = 0
+        for i in range(svm.data_num):
+            temp += svm.a[i]*svm.label[i]*svm.K[i,k]
+        temp += svm.b
+        return temp
+
+def calcError(svm, k):
+    output_k = 0
+    #output_k = float(sum( (svm.a*svm.label) * svm.K[:, alpha_k] )+ svm.b)
+    for i in range(svm.data_num):
+        output_k += svm.a[i]*svm.label[i]*svm.K[i, k] #************************
+    output_k += svm.b
+    Ek = output_k - svm.label[k]
+    return Ek
+
+def updateError(svm, k):
+    error = calcError(svm, k)
+    svm.E[k,] = [1, error]
+
+
+def findJ(svm, k, Ei): #根据a1,寻找a2
+    svm.E[k] = [1, Ei]
+    Ej = 0
+    maxE = 0
+    pos_j = 0
+    validEcacheList = nonzero(svm.E[:, 0])[0]
+    if len(validEcacheList) > 1:
+        for i in validEcacheList:
+            if k == i:
+                continue
+            tempE = calcError(svm,i)
+            if maxE < abs(Ei - tempE):
+                maxE = abs(Ei - tempE)
+                pos_j = i
+                Ej = tempE
+    else:
+        l = list(range(svm.data_num))
+        seq = l[:k] + l[k + 1:] # 排除掉已选的 k
+        pos_j = random.choice(seq)
+        Ej = calcError(svm, pos_j)
+    return pos_j, Ej
+
+def updateParam(svm, i):
+    Ei = calcError(svm, i)
+    if ((svm.label[i]*Ei < -svm.toler) and (svm.a[i] < svm.c))\
+        or ((svm.label[i]*Ei > svm.toler) and (svm.a[i] > 0)): # 违反KKT条件的a1
+        j, Ej = findJ(svm, i, Ei)
+        old_a1 = svm.a[i].copy()
+        old_a2 = svm.a[j].copy()
+        eta = svm.K[i,i] + svm.K[j,j] - 2.0 * svm.K[i,j]
+        if eta < 0:
+            return 0
+        temp_a2 = old_a2 + svm.label[j] * (Ei - Ej) / eta
+        if svm.label[i] == svm.label[j]:
+            L = max(0, old_a2 + old_a1 - svm.c)
+            H = min(svm.c, old_a2 + old_a1)
+        else:
+            L = max(0, old_a2 - old_a1)
+            H = min(svm.c, svm.c + old_a2 - old_a1)
+        if L == H:
+            return 0
+        if temp_a2 > H:
+            svm.a[j] = H
+        elif temp_a2 < L:
+            svm.a[j] = L
+        else:
+            svm.a[j] = temp_a2
+
+        if abs(old_a2 - svm.a[j]) < 0.00001:
+            updateError(svm, j)
+            return 0
+
+        svm.a[i] = old_a1 + svm.label[i] * svm.label[j] * (old_a2 - svm.a[j])
+        new_b1 = -Ei\
+                - svm.label[i]*svm.K[i,i]*(svm.a[i]-old_a1)\
+                - svm.label[j]*svm.K[j,i]*(svm.a[j]-old_a2)\
+                + svm.b
+        new_b2 = -Ej\
+                - svm.label[i]*svm.K[i,j]*(svm.a[i]-old_a1)\
+                - svm.label[j]*svm.K[j,j]*(svm.a[j]-old_a2)\
+                + svm.b
+        if (svm.a[i] > 0) and (svm.a[i] < svm.c):
+            svm.b = new_b1
+        elif (svm.a[j] > 0) and (svm.a[j] < svm.c):
+            svm.b = new_b2
+        else:
+            svm.b = (new_b1 + new_b2) / 2
+        updateError(svm, j)
+        updateError(svm, i)
+        #print('svm.a[i]',i,svm.a[i],'svm.a[j]',j,svm.a[j])
+        return 1
+    else:
+        return 0
+
+def smoTrain(svm, maxIter):
+    iterCount = 0
+    alphaPairsChanged = 0
+    entireSet = True
+    while (iterCount < maxIter) and ((alphaPairsChanged > 0) or entireSet):
+        alphaPairsChanged = 0
+        if entireSet: # 遍历整个数据集
+            for i in range(svm.data_num):
+                alphaPairsChanged += updateParam(svm, i)
+            print('---iter:%d entire set, alpha pairs changed:%d' % (iterCount, alphaPairsChanged))
+        
+        else:  # 对边界上的alpha遍历(即约束在0<a1<C内的样本点)
+            nonBoundIs = nonzero((svm.a > 0) * (svm.a < svm.c))[0]
+            """
+            nonBoundIs = []
+            for i in range(svm.data_num):
+                if (0 < svm.a[i] and svm.a[i] < svm.c):
+                    nonBoundIs.append(i)
+            """
+            for i in nonBoundIs:
+                alphaPairsChanged += updateParam(svm, i)
+            print('---iter:%d non boundary, alpha pairs changed:%d' % (iterCount, alphaPairsChanged))
+        iterCount += 1
+        if entireSet:
+            entireSet = False
+        elif alphaPairsChanged == 0:
+            entireSet = True
+    return svm
+
+def calcWB(svm):
+    w = np.zeros((svm.data_width))
+    temp_B = 0
+    pos = 0
+    for i in range(svm.data_num):
+        w += svm.a[i]*svm.label[i]*svm.data[i,:]
+        if svm.a[i] > 0 and svm.a[i] < svm.c:
+            pos = i
+    print('w：',w)
+    """
+    for i in range(svm.data_num):
+        temp_B += svm.a[i]*svm.label[i]*svm.K[i,pos]
+    B = svm.label[pos] - temp_B
+    """
+    return w, svm.b #****************
+
+def lossCount(svm):
+        loss = 0
+        for i in range(svm.data_num):
+            for j in range(svm.data_num):
+                loss += svm.a[i]*svm.a[j]*svm.label[i]*svm.label[j]\
+                       *svm.K[i,j]
+        loss = 0.5*loss-sum(svm.a)
         return loss
-
-
-    def smoTrain(self):#采用SMO算法
-        a = np.zeros(data.shape[0])
-        b = 0
-        iterCount = 0 # 迭代次数
-        E = np.zeros(self.data_num)
-        last_loss = self.lossCount(a) # 目标函数值
-        for i in range(self.data_num): # 初始化E值
-            E[i] = self.g(self.data[i,:], a, b) - self.label[i]
-        #error = np.zeros(self.data_num)
-        while True:
-            iterCount += 1
-            """
-            error = np.zeros(self.data_num)
-            for j in range(self.data_num): # 外层循环，确定a1
-                if a[j] > 0 and a[j] < self.c:
-                    flag = self.label[j]*self.g(self.data[j,:], a, b)
-                    if flag == 1:
-                        continue
-                    else:
-                        error[j] = abs(1-flag)
-            if max(error) == 0: # 所有0<a<c的样本点均满足KKT条件,遍历整个训练集
-                for j in range(self.data_num): 
-                    if a[j] == 0:
-                        flag = self.label[j]*self.g(self.data[j,:], a, b)
-                        if flag >1:
-                            continue
-                        else:
-                            error[j] = abs(1-flag)
-                    elif a[j] == self.c:
-                        flag = self.label[j]*self.g(self.data[j,:], a, b)
-                        if flag <1:
-                            continue
-                        else:
-                            error[j] = abs(1-flag)
-            pos_j = np.argmax(error) # 违反KKT条件最严重的为a1; pos_i:a2, pos_j: a1
-            """
-            for j in range(self.data_num): # 外层循环，确定a1
-                if((self.label[j]*self.g(self.data[j,:],a,b) < 1-self.toler) and (a[j] < self.c)\
-                    or (self.label[j]*self.g(self.data[j,:],a,b) > 1+self.toler) and (a[j] > 0)):
-                    pos_j = j
-                    
-                    pos_j, pos_i = self.find(a, b, E, pos_j, last_loss)
-                    a, b, E = self.updateParam(a, b, E, pos_j, pos_i)
-                    last_loss = self.lossCount(a)
-                    #last_loss = next_loss
-            print('---iter:%d entire set' % (iterCount))
-                
-
-            #temp_E = E
-            """
-            if E[pos_j] >=0:
-                pos_i = np.argmin(temp_E) #TODO 
-            else:
-                pos_i = np.argmax(temp_E)
-            temp_a, temp_b, temp_E = self.updateParam(a, b, E, pos_j, pos_i)
-            next_loss = self.lossCount(temp_a)
-            Temp_a = []
-            Temp_b = []
-            Temp_E = []
-            if last_loss <= next_loss:
-                tempLoss = []
-                for i in range(self.data_num):#遍历整个训练集寻找a2
-                    if pos_j != i:
-                        pos_i = i
-                    else:
-                        tempLoss.append(10000)
-                        Temp_a.append([0])
-                        Temp_b.append([0])
-                        Temp_E.append([0])
-                        continue
-                    temp_a, temp_b, temp_E = self.updateParam(a, b, E, pos_j, pos_i)
-                    next_loss = self.lossCount(temp_a)
-                    tempLoss.append(next_loss)
-                    Temp_a.append(temp_a)
-                    Temp_b.append(temp_b)
-                    Temp_E.append(temp_E)
-                pos_i = np.argmin(tempLoss)
-                if tempLoss[pos_i] < last_loss:
-                    continue
-                else : # 寻找新的a1
-                    temp_error = error
-                    temp_error[pos_j] = 0
-                    pos_j = np.argmax[temp_error]
-            """
-
-                    
-
-
-            """
-            while True :
-                if last_loss > next_loss:
-                    break
-                for i in range(self.data_num):#遍历边界上的支持向量点作为a2
-                    if self.a[i] > 0 and self.a[i] < self.c and pos_j != i:
-                        pos_i = i
-                        self.updateParam(pos_j, pos_i)
-                        next_loss = self.lossCount()
-                        if last_loss > next_loss:
-                            break 
-                if last_loss <= next_loss:#边界上无合适的a2，遍历整个训练集作a2
-                    TempCount = 0
-                    for i in range(self.data_num):
-                        if pos_j != i:
-                            pos_i = i
-                        else:
-                            continue
-                        self.updateParam(pos_j, pos_i)
-                        next_loss = self.lossCount()
-                        TempCount += 1
-                        if last_loss > next_loss:
-                            break
-                        if TempCount == self.data_num - 1:#重新选择a1
-                            temp_error[pos_j] = 0
-                            pos_j = np.argmax(temp_error)
-                if sum(temp_error) == 0:
-                    break
-            """
-            
-
-            #判断是否结束训练
-            #done = self.finishTrain(self.a, self.b)
-            if (iterCount > self.maxIter):
-                done = self.finishTrain(a, b)
-                break
-        #return self.a, self.b
-        w = np.zeros(self.data_width)
-        temp_B = 0
-        pos = 0
-        for i in range(self.data_num):
-            w += a[i]*self.label[i]*self.data[i,:]
-            if a[i] > 0 and a[i] < self.c:
-                pos = i
-        print('w：',w)
-        print('pos:',pos)
-        for i in range(self.data_num):
-            temp_B += a[i]*self.label[i]*self.k(self.data[i,:], self.data[pos,:])
-        B = self.label[pos] - temp_B
-        return w, B, a, done
-
 
 if __name__ == '__main__':
     D1 = scio.loadmat('C:\\Users\\MH\\Desktop\\MyCode\\MLalgorithm\\SVM\\Data1.mat')
     data = D1['data']
-    #print(data[1:5,:])
-    mySVM = SVM(data[0:70,0:2], data[0:70,2], 1, 1, 0.001, 50, 'linear')
-    w, b, a, done = mySVM.smoTrain()
-    print(done)
-    print(a)
-    #print(w)
-    for i in range(70):
-        if a[i] > 0:
+    mySVM = SVM(data[0:100,0:2], data[0:100,2], 20, 1, 0.001, 'linear')
+    mySVM = smoTrain(mySVM, 10)
+    w, b = calcWB(mySVM)
+    for i in range(100):
+        if mySVM.a[i] > 0:
             plt.plot(data[i, 0], data[i, 1], 'oy')
         else:
             if data[i,2] == 1:
@@ -320,9 +200,8 @@ if __name__ == '__main__':
     x = np.arange(0,1,0.05)
     y = -(w[0]/w[1]) * x - b/w[1]
     plt.plot(x,y,'-g')
-    plt.legend(('SV', 'y = 1', 'y = -1','f(x)'),
-           loc='upper right')
-    plt.title('C = 10')
+    #plt.legend(('SV', 'y = 1', 'y = -1','f(x)'),loc='upper right')
+    plt.title('C = 20')
     plt.show()
 
 
