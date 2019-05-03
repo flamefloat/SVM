@@ -10,11 +10,12 @@ class SVM():
     c:惩罚系数
     sigma:RBF核函数参数
     """
-    def __init__(self, data, label, c, sigma, maxIter, kernel):
+    def __init__(self, data, label, c, sigma, toler, maxIter, kernel):
         self.data = data
         self.label = label
         self.c = c
         self.sigma = sigma
+        self.toler = toler #KKT条件精度
         self.maxIter = maxIter
         self.kernel = kernel
         self.data_num = data.shape[0] # 训练集长度
@@ -66,17 +67,25 @@ class SVM():
                  - self.label[pos_j]*self.k(self.data[pos_j], self.data[pos_i])*(a[pos_j]-old_a1)\
                  - self.label[pos_i]*self.k(self.data[pos_i], self.data[pos_i])*(a[pos_i]-old_a2)\
                  + b
-        b = (new_b1 + new_b2) / 2
+        if (a[pos_j] > 0) and (a[pos_j] < self.c):
+            b = new_b1
+        elif (a[pos_i] > 0) and (a[pos_i] < self.c):
+            b = new_b2
+        else:
+            b = (new_b1 + new_b2) / 2
         E[pos_j] = self.g(self.data[pos_j,:], a, b) - self.label[pos_j]
         E[pos_i] = self.g(self.data[pos_i,:], a, b) - self.label[pos_i]
         return a, b, E
 
-    def find(self, a, b, E, pos_j, error, last_loss):
+    def find(self, a, b, E, pos_j, last_loss):
         if E[pos_j] >=0:
             pos_i = np.argmin(E) #TODO 
         else:
             pos_i = np.argmax(E)
+        return pos_j, pos_i
+        """
         temp_a, temp_b, temp_E = self.updateParam(a, b, E, pos_j, pos_i)
+        
         next_loss = self.lossCount(temp_a)
         Temp_a = []
         Temp_b = []
@@ -107,13 +116,16 @@ class SVM():
             if tempLoss[pos_i] < last_loss:
                 return pos_j, pos_i
             else : # 寻找新的a1
-               
+                return False
+        
+            
                 temp_error = error
                 temp_error[pos_j] = 0
                 pos_j = np.argmax(temp_error)
                 print('**********','pos_j:',pos_j,'temp_error[pos_j]:',temp_error[pos_j])
                 #print('lastloss:',last_loss)
                 self.find(a, b, E, pos_j, temp_error, last_loss)
+        """
                  
             
 
@@ -159,6 +171,7 @@ class SVM():
         #error = np.zeros(self.data_num)
         while True:
             iterCount += 1
+            """
             error = np.zeros(self.data_num)
             for j in range(self.data_num): # 外层循环，确定a1
                 if a[j] > 0 and a[j] < self.c:
@@ -182,9 +195,18 @@ class SVM():
                         else:
                             error[j] = abs(1-flag)
             pos_j = np.argmax(error) # 违反KKT条件最严重的为a1; pos_i:a2, pos_j: a1
-            pos_j, pos_i = self.find(a, b, E, pos_j, error, last_loss)
-            a, b, E = self.updateParam(a, b, E, pos_j, pos_i)
-            next_loss = self.lossCount(a)
+            """
+            for j in range(self.data_num): # 外层循环，确定a1
+                if((self.label[j]*self.g(self.data[j,:],a,b) < 1-self.toler) and (a[j] < self.c)\
+                    or (self.label[j]*self.g(self.data[j,:],a,b) > 1+self.toler) and (a[j] > 0)):
+                    pos_j = j
+                    
+                    pos_j, pos_i = self.find(a, b, E, pos_j, last_loss)
+                    a, b, E = self.updateParam(a, b, E, pos_j, pos_i)
+                    last_loss = self.lossCount(a)
+                    #last_loss = next_loss
+            print('---iter:%d entire set' % (iterCount))
+                
 
             #temp_E = E
             """
@@ -255,8 +277,7 @@ class SVM():
                 if sum(temp_error) == 0:
                     break
             """
-            last_loss = next_loss
-            print('iter:',iterCount,'a1:',pos_j,'a2:',pos_i)
+            
 
             #判断是否结束训练
             #done = self.finishTrain(self.a, self.b)
@@ -283,7 +304,7 @@ if __name__ == '__main__':
     D1 = scio.loadmat('C:\\Users\\MH\\Desktop\\MyCode\\MLalgorithm\\SVM\\Data1.mat')
     data = D1['data']
     #print(data[1:5,:])
-    mySVM = SVM(data[0:70,0:2], data[0:70,2], 10, 1, 50, 'linear')
+    mySVM = SVM(data[0:70,0:2], data[0:70,2], 1, 1, 0.001, 50, 'linear')
     w, b, a, done = mySVM.smoTrain()
     print(done)
     print(a)
